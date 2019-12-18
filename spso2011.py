@@ -10,13 +10,14 @@
 
 from SearchSpace import SearchSpace
 from Particle import Particle
+import numpy as np
 # TODO: Use numba optimization
 
 
 class SPSO2011:
     def __init__(self, swarm_size, swarm_dimension, inertial_weight,
                  cognitive_acc, social_acc, neighbors,
-                 lower_bound, upper_bound, normalize, graph):
+                 lower_bound, upper_bound, normalize, graph, filter_param):
         self.swarm_size = swarm_size
         self.swarm_dimension = swarm_dimension
         self.inertial_weight = inertial_weight
@@ -27,6 +28,7 @@ class SPSO2011:
         self.upper_bound = upper_bound
         self.normalize = normalize
         self.graph = graph
+        self.filter_param = filter_param
 
     def optimize(self, iterations):
         # Init the particles with position and velocity
@@ -40,7 +42,8 @@ class SPSO2011:
                                    self.lower_bound,
                                    self.upper_bound,
                                    self.normalize,
-                                   self.graph)
+                                   self.graph,
+                                   self.filter_param)
 
         particles_vector = [Particle(self.swarm_dimension) for _ in range(search_space.swarm_size)]
         search_space.particles = particles_vector
@@ -48,6 +51,7 @@ class SPSO2011:
         search_space.calc_fitness()
         [search_space.particles[i].update_personal_best() for i in range(search_space.swarm_size)]
         search_space.update_global_best()
+        iters = 0
         if search_space.graph:
             search_space.graph_particles(0)
         for iteration_index in range(iterations):
@@ -59,9 +63,16 @@ class SPSO2011:
                 search_space.graph_particles(iteration_index + 1)
             if search_space.check_stop_criteria():
                 break
+            iters += 1
+        print("The best solution is: ", np.round(search_space.gbest_position))
+        print("\n Number of iterations: ", iters)
+        print("\n Best fitness: ", search_space.gbest_value)
 
-        print("The best solution is: ", search_space.gbest_position)
-
+        [fitness, converged, cap, f0, d, g] = search_space.calc_filter(search_space.gbest_position)
+        result = [fitness, iters, converged] + cap + [f0, d, g]
+        # result = search_space.calc_filter(search_space.gbest_position)
+        print(result)
+        return result
 # Bibliography:
 # http://clerc.maurice.free.fr/pso/random_topology.pdf
 # http://mat.uab.cat/~alseda/MasterOpt/SPSO_descriptions.pdf

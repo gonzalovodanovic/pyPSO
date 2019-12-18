@@ -10,9 +10,8 @@ import matplotlib.pyplot as plt
 
 class SearchSpace:
     def __init__(self, swarm_size, swarm_dimension, inertial_weight,
-                 # Constructor, define el estado inicial de los atributos
-                 cognitive_acc, social_acc, neighbors,  # El estado del obj te lo define el valor de los atributos
-                 lower_bound, upper_bound, normalize, graph):
+                 cognitive_acc, social_acc, neighbors,
+                 lower_bound, upper_bound, normalize, graph, filter_param):
         # Attributes
         self.swarm_size = swarm_size
         self.swarm_dimension = swarm_dimension
@@ -35,7 +34,9 @@ class SearchSpace:
             self.graph_z = self.graph_x ** 2 + self.graph_y ** 2 + 1
         # TODO: Should be an attributes
         self.uniform = False
-        self.max_error = 0.001
+        self.max_error = 0.05
+        self.fitness_max_error = 10.0
+        self.filter_param = filter_param
 
     def particles_initialization(self):
         if self.normalize:
@@ -50,6 +51,41 @@ class SearchSpace:
                                       (x_max[i] - p.position[i])))
                           for i in range(self.swarm_dimension)]
 
+    def calc_filter(self, position):
+        [design_d, design_g, design_f0, design_fs] = self.filter_param
+        [c1, c2, c3, c4, ca, cb] = np.round(position)
+        ca = ca * 16
+        cb = cb * 16
+        cap = [c1, c2, c3, c4, ca, cb]
+        converged = True
+        if (ca * cb) - ((c4 * c3) / 2.0) - ((c2 * c3) / 4.0) > 0.0:
+            d = (c4 * np.sqrt(c3 / c2)) / (np.sqrt((ca * cb) - ((c4 * c3) / 2.0) - ((c2 * c3) / 4.0)))
+            f0 = ((design_fs / (2.0 * np.pi)) *
+                  np.sqrt(c2 * c3)) / (np.sqrt((ca * cb) - ((c4 * c3) / 2.0) - ((c2 * c3) / 4.0)))
+            g = c1 / c2
+            # TODO: Create function for check_errors
+            error_d = np.abs((d - design_d) / design_d)
+            if error_d > self.max_error:
+                error_d = 10.0
+                converged = False
+            error_g = np.abs((g - design_g) / design_g)
+            if error_g > self.max_error:
+                error_g = 10.0
+                converged = False
+            error_f0 = np.abs((f0 - design_f0) / design_f0)
+            if error_f0 > self.max_error:
+                error_f0 = 10.0
+                converged = False
+            fitness = error_d + error_g + error_f0
+        else:
+            fitness = 30.0
+            d = np.inf
+            f0 = np.inf
+            g = np.inf
+            converged = False
+
+        return [fitness, converged, cap, f0, d, g]
+
     def calc_fitness(self):
         for p in self.particles:
             if self.normalize:
@@ -58,7 +94,8 @@ class SearchSpace:
             else:
                 position = p.position
 
-            p.fitness = position[0] ** 2 + position[1] ** 2 + 1
+            [fitness, converged, cap, f0, d, g] = self.calc_filter(position)
+            p.fitness = fitness
 
     def build_informers_matrix(self):  # TODO: Add if(stagn)
         informers_matrix = np.identity(self.swarm_size)  # Each particle informs itself
@@ -149,7 +186,7 @@ class SearchSpace:
                 self.check_boundaries(particle_index, dimension_index)
 
     def check_stop_criteria(self):
-        if self.gbest_value < self.max_error:
+        if self.gbest_value < self.fitness_max_error:
             return True
         else:
             return False
