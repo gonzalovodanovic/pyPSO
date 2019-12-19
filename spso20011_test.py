@@ -13,23 +13,21 @@ inertial_weight = 1/(2*np.log(2.0))
 cognitive_acc = 1
 social_acc = 3
 lower_bound = [1, 1, 1, 1, 1, 1]
-upper_bound = [32, 32, 32, 32, 2, 2]
+upper_bound = [31, 31, 31, 31, 2, 2]
 normalize = True
 neighbors = 3
 graph = False
 max_iterations = 300
-n_threads = 5
+n_threads = 4
+
 threads = [max_iterations for i in range(n_threads)]
+max_error = 0.05
 
 f0fsArray = pd.read_csv("f0_fs_array.csv", names=["f0", "fs"], skiprows=1)
-# spec_list_G = [0.5, 0.75, 1.0, 2.0, 4.0, 8.0, 16.0]
-# spec_list_d = [0.125, 0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0]
-# spec_list_f = f0fsArray['f0']
-# spec_list_fs = f0fsArray['fs']
-spec_list_G = [0.5]
-spec_list_d = [0.125]
-spec_list_f = [1010]
-spec_list_fs = [51000]
+spec_list_G = [0.5, 0.75, 1.0, 2.0, 4.0, 8.0, 16.0]
+spec_list_d = [0.125, 0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0]
+spec_list_f = f0fsArray['f0']
+spec_list_fs = f0fsArray['fs']
 paramCombination_list = [(a, b, spec_list_f[c], spec_list_fs[c]) for a in spec_list_d for b in spec_list_G
                          for c in range(len(spec_list_f))]
 
@@ -50,8 +48,9 @@ for spec in paramCombination_list:
                                       upper_bound,
                                       normalize,
                                       graph,
-                                      spec)
-    for i in range(3):
+                                      spec,
+                                      max_error)
+    for i in range(25):
         result = pool.map(pso_optimizer.optimize, threads)
         for thread in range(n_threads):
             pso_filter_LP.loc[counter] = [spec[2], spec[0], spec[1]] + result[thread]

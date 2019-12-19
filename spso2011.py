@@ -11,13 +11,16 @@
 from SearchSpace import SearchSpace
 from Particle import Particle
 import numpy as np
+from fitness import calc_filter_parameters
+
 # TODO: Use numba optimization
 
 
 class SPSO2011:
     def __init__(self, swarm_size, swarm_dimension, inertial_weight,
-                 cognitive_acc, social_acc, neighbors,
-                 lower_bound, upper_bound, normalize, graph, filter_param):
+                 cognitive_acc, social_acc, neighbors, lower_bound, upper_bound,
+                normalize, graph, filter_param, max_error):
+
         self.swarm_size = swarm_size
         self.swarm_dimension = swarm_dimension
         self.inertial_weight = inertial_weight
@@ -29,6 +32,7 @@ class SPSO2011:
         self.normalize = normalize
         self.graph = graph
         self.filter_param = filter_param
+        self.max_error = max_error
 
     def optimize(self, iterations):
         # Init the particles with position and velocity
@@ -43,12 +47,13 @@ class SPSO2011:
                                    self.upper_bound,
                                    self.normalize,
                                    self.graph,
-                                   self.filter_param)
+                                   self.filter_param,
+                                   self.max_error)
 
         particles_vector = [Particle(self.swarm_dimension) for _ in range(search_space.swarm_size)]
         search_space.particles = particles_vector
         search_space.particles_initialization()
-        search_space.calc_fitness()
+        search_space.update_fitness()
         [search_space.particles[i].update_personal_best() for i in range(search_space.swarm_size)]
         search_space.update_global_best()
         iters = 0
@@ -57,7 +62,7 @@ class SPSO2011:
         for iteration_index in range(iterations):
             search_space.move_particles()
             [search_space.particles[i].update_personal_best() for i in range(search_space.swarm_size)]
-            search_space.calc_fitness()
+            search_space.update_fitness()
             search_space.update_global_best()
             if search_space.graph:
                 search_space.graph_particles(iteration_index + 1)
@@ -68,11 +73,12 @@ class SPSO2011:
         print("\n Number of iterations: ", iters)
         print("\n Best fitness: ", search_space.gbest_value)
 
-        [fitness, converged, cap, f0, d, g] = search_space.calc_filter(search_space.gbest_position)
+        [fitness, converged, cap, f0, d, g] = calc_filter_parameters(np.float64(search_space.gbest_position),
+                                                                     self.filter_param, self.max_error)
         result = [fitness, iters, converged] + cap + [f0, d, g]
-        # result = search_space.calc_filter(search_space.gbest_position)
         print(result)
         return result
+
 # Bibliography:
 # http://clerc.maurice.free.fr/pso/random_topology.pdf
 # http://mat.uab.cat/~alseda/MasterOpt/SPSO_descriptions.pdf
